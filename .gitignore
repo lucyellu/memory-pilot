@@ -3,3 +3,4 @@
 __pycache__/
 *.log
 data/smoke_openrouter_old/
+data/claude_cli_cwd/

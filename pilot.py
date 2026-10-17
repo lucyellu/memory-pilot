@@ -40,13 +40,14 @@ RAW_JSONL = DATA / "raw.jsonl"
 # Config -- edit these freely
 # ---------------------------------------------------------------------------
 
-# Subject models: the ones being tested. Prefix = provider (see PROVIDERS; "anthropic:" =
-# Anthropic API). A small, two mid-size open models (free tiers) + one frontier model.
+# Subject models: the ones being tested. Prefix = provider (see PROVIDERS; "claudecli:" =
+# the local `claude` CLI on a Claude subscription, no API key). A small and two mid-size open
+# models (free tiers) + one frontier model.
 SUBJECT_MODELS = [
     "nvidia:meta/llama-3.2-11b-vision-instruct",
     "groq:qwen/qwen3.8-27b",
     "nvidia:google/gemma-4-31b-it",
-    "anthropic:claude-opus-5-5",
+    "claudecli:claude-opus-5-5",
 ]
 
 # Graders: read each response and label it (yes/no/hedge, invented details, etc.).
@@ -216,14 +217,40 @@ def build():
 # Model calls
 # ---------------------------------------------------------------------------
 
-_anthropic_client = None
+import subprocess  # noqa: E402
 
-def anthropic_client():
-    global _anthropic_client
-    if _anthropic_client is None:
-        import anthropic
-        _anthropic_client = anthropic.Anthropic()
-    return _anthropic_client
+CLAUDE_CLI_DIR = DATA / "claude_cli_cwd"  # empty folder, so no CLAUDE.md or project settings load
+CLAUDE_SYSTEM = "You are a helpful assistant."
+
+
+def claude_cli(model, prompt, session=None):
+    """One turn through the `claude` CLI (headless) on the logged-in subscription -> (text, session id).
+
+    Replaces Claude Code's system prompt and disables tools, MCP and settings. Multi-turn
+    conversations continue the same CLI session with --resume, so the model sees real history.
+    """
+    CLAUDE_CLI_DIR.mkdir(parents=True, exist_ok=True)
+    cmd = ["claude", "-p", prompt, "--model", model, "--system-prompt", CLAUDE_SYSTEM, "--tools", "",
+           "--strict-mcp-config", "--setting-sources", "", "--output-format", "json"]
+    if session:
+        cmd += ["--resume", session]
+    # Without ANTHROPIC_API_KEY the CLI uses the subscription login instead of billing the API.
+    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+    for attempt in range(4):
+        r = subprocess.run(cmd, cwd=CLAUDE_CLI_DIR, env=env, capture_output=True, text=True,
+                           encoding="utf-8", timeout=600)
+        try:
+            body = json.loads(r.stdout)
+        except json.JSONDecodeError:
+            body = {}
+        if body.get("is_error") or not body.get("result"):
+            if attempt < 3:
+                time.sleep(30 * (attempt + 1))  # usage limits are usually short waits
+                continue
+            raise RuntimeError(f"claude CLI failed: {(r.stdout or r.stderr)[:300]}")
+        if body.get("stop_reason") == "max_tokens":
+            raise RuntimeError("reply cut off at max_tokens")
+        return body["result"], body["session_id"]
 
 
 # OpenAI-compatible providers: name -> (base URL, key env var).
@@ -238,7 +265,7 @@ PROVIDERS = {
 def split_provider(model):
     """'nvidia:x/y' -> ('nvidia', 'x/y'); 'x/y:free' (no known prefix) -> ('openrouter', 'x/y:free')."""
     prefix, _, rest = model.partition(":")
-    if prefix in PROVIDERS or prefix == "anthropic":
+    if prefix in PROVIDERS or prefix == "claudecli":
         return prefix, rest
     return "openrouter", model
 
@@ -277,16 +304,13 @@ def chat(model, messages):
     if provider in PROVIDERS:
         text = openrouter(model, messages, max_tokens=6000)
         return text, {"role": "assistant", "content": text}
-    if provider == "anthropic":
-        resp = anthropic_client().messages.create(model=name, max_tokens=8000, messages=messages)
-        if resp.stop_reason == "max_tokens":
-            raise RuntimeError("reply cut off at max_tokens=8000")
-        if resp.stop_reason == "refusal":
-            text = "[REFUSED]"
-        else:
-            text = "".join(b.text for b in resp.content if b.type == "text")
-        # Append the full content (incl. thinking blocks) unchanged for multi-turn.
-        return text, {"role": "assistant", "content": resp.content}
+    if provider == "claudecli":
+        # The CLI keeps the history itself: send only the new user turn, resuming the session
+        # recorded on the previous assistant message.
+        prev = [m for m in messages if m["role"] == "assistant"]
+        session = prev[-1]["session"] if prev else None
+        text, session = claude_cli(name, messages[-1]["content"], session)
+        return text, {"role": "assistant", "content": text, "session": session}
     raise ValueError(f"unknown provider in {model}")
 
 # ---------------------------------------------------------------------------
@@ -341,7 +365,7 @@ GRADED_TURNS = ["neutral", "neutral_2", "neutral_3", "leading", "implant_list", 
 # Grading
 # ---------------------------------------------------------------------------
 
-from pydantic import BaseModel  # noqa: E402  (installed with anthropic)
+from pydantic import BaseModel  # noqa: E402
 
 
 class Grade(BaseModel):
@@ -656,13 +680,10 @@ def validate():
 def check():
     """Free: confirms each key works and every model name exists. Spends nothing."""
     ok = True
-    needs_anthropic = any(m.startswith("anthropic:") for m in SUBJECT_MODELS)
-    if needs_anthropic:
-        print(f"ANTHROPIC_API_KEY: {'set' if os.environ.get('ANTHROPIC_API_KEY') else 'MISSING'}")
-        ok &= bool(os.environ.get("ANTHROPIC_API_KEY"))
+    cli_models = [m for m in SUBJECT_MODELS if m.startswith("claudecli:")]
     # Every model on an OpenAI-compatible provider: key works, and the provider lists the model.
     by_provider = {}
-    for m in [x for x in SUBJECT_MODELS if not x.startswith("anthropic:")] + [JUDGE_MODEL, SECOND_JUDGE]:
+    for m in [x for x in SUBJECT_MODELS if x not in cli_models] + [JUDGE_MODEL, SECOND_JUDGE]:
         provider, name = split_provider(m)
         by_provider.setdefault(provider, []).append(name)
     for provider, names in by_provider.items():
@@ -681,17 +702,12 @@ def check():
             # NVIDIA lists some models it then refuses for this account, so "found" isn't a guarantee there.
             print(f"  {provider}:{name}: {'found' if name in ids else 'NOT FOUND'}")
             ok &= name in ids
-    if needs_anthropic and os.environ.get("ANTHROPIC_API_KEY"):
+    for m in cli_models:
         try:
-            names = {m.id for m in anthropic_client().models.list(limit=100)}
-            print("  Anthropic key: works")
-            for m in SUBJECT_MODELS:
-                if m.startswith("anthropic:"):
-                    found = m.split(":", 1)[1] in names
-                    print(f"{m}: {'found' if found else 'NOT FOUND for this key'}")
-                    ok &= found
+            claude_cli(split_provider(m)[1], "Reply with the word ok.")
+            print(f"{m}: works (claude CLI, subscription login)")
         except Exception as e:
-            print(f"  Anthropic key: REJECTED ({type(e).__name__})")
+            print(f"{m}: FAILED ({str(e)[:200]})")
             ok = False
     print("\nAll good." if ok else "\nFix the items above, then re-run check.")
 
@@ -699,10 +715,10 @@ def check():
 def smoke():
     """Whole pipeline on one drug with free models, in data/smoke + results_smoke.
 
-    `smoke --claude` also runs Claude on that one drug (a few cents) to test that code path.
+    `smoke --claude` also runs Claude (via the claude CLI) on that one drug to test that code path.
     """
     global SUBJECT_MODELS, JUDGE_MODEL, SECOND_JUDGE, RAW_JSONL, RESULTS, WORKERS, ITEMS_FILTER
-    SUBJECT_MODELS = SMOKE_SUBJECTS + [m for m in SUBJECT_MODELS if m.startswith("anthropic:")
+    SUBJECT_MODELS = SMOKE_SUBJECTS + [m for m in SUBJECT_MODELS if m.startswith("claudecli:")
                                        and "--claude" in sys.argv]
     JUDGE_MODEL, SECOND_JUDGE = SMOKE_JUDGE, SMOKE_SECOND_JUDGE
     RAW_JSONL = DATA / "smoke" / "raw.jsonl"

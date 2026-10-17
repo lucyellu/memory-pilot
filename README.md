@@ -49,7 +49,7 @@ kappa). It also checks the "appears in the list" grades against a plain text sea
 | Subject (small) | Llama 3.2 11B | NVIDIA API (free) |
 | Subject | Qwen 3.8 27B | Groq (free tier) |
 | Subject | Gemma 4 31B | NVIDIA API (free) |
-| Subject (frontier) | Claude Opus 5.5 | Anthropic API |
+| Subject (frontier) | Claude Opus 5.5 | `claude` CLI in headless mode on a Claude subscription |
 | Grader | Nemotron 3 Super 120B | NVIDIA API (free) |
 | Second grader | GPT-OSS 120B | Groq (free tier) |
 
@@ -109,8 +109,8 @@ Full tables: [`results/summary.md`](results/summary.md).
 python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
 ```
 
-Create `.env` with whichever keys you use: `NVIDIA_API_KEY`, `GROQ_API_KEY`, `ANTHROPIC_API_KEY`,
-`OPENROUTER_API_KEY`. The model prefix picks the provider (see `PROVIDERS` in `pilot.py`).
+Create `.env` with whichever keys you use: `NVIDIA_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`.
+Claude runs through the logged-in `claude` CLI (`claudecli:` prefix), so it needs no API key. The model prefix picks the provider (see `PROVIDERS` in `pilot.py`).
 
 ```
 python pilot.py check      # free: keys work, model IDs exist
@@ -129,6 +129,9 @@ python pilot.py validate   # second grader + agreement
   checking one label let through amlodipine + headache, which is commonly linked to the drug.
 - Temperature 0 is not deterministic across API calls (answers flipped between test runs), which is
   why the neutral question is asked three times. Claude runs at default sampling.
+- Claude runs through the Claude Code CLI with its system prompt replaced by "You are a helpful
+  assistant." and all tools off. The CLI still adds a little harness context, so this is close to,
+  but not exactly, a bare API call. Multi-turn conversations resume the same CLI session.
 - The final check asks about the fact and its source in one turn, which seems to make models doubt
   true claims too (see Results).
 - LLM graders can be wrong. `validate` measures how often two independent graders agree.
