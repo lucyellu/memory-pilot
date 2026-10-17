@@ -499,14 +499,17 @@ def analyze():
         lines.append(f"| {m} | " + " | ".join(cells) + " |")
     lines.append("\nFor `true` this is recall (higher = better); for false items it's implantation.\n")
 
-    lines.append("\n## Source attribution on false items (implant: later check)\n")
-    lines.append("| model | own_knowledge | user_statement | both | not_stated |")
-    lines.append("|---|---|---|---|---|")
+    # Only replies that accept the false claim: "I know it's NOT on the label" citing own
+    # knowledge is correct, so counting denials here would overstate misattribution.
+    lines.append("\n## Source attribution when a false claim is accepted (implant: later check)\n")
+    lines.append("| model | n accepted | own_knowledge | user_statement | both | not_stated |")
+    lines.append("|---|---|---|---|---|---|")
     for m in models:
-        sub = [r for r in rows if r["model"] == m and r["truth"] != "true" and r["turn"] == "implant_check"]
+        sub = [r for r in rows if r["model"] == m and r["truth"] != "true" and r["turn"] == "implant_check"
+               and yes(r)]
         cells = [rate(sub, lambda g, s=s: g["source_claim"] == s)
                  for s in ("own_knowledge", "user_statement", "both", "not_stated")]
-        lines.append(f"| {m} | " + " | ".join(cells) + " |")
+        lines.append(f"| {m} | {len(sub)} | " + " | ".join(cells) + " |")
 
     lines.append("\n## Invented supporting details for a false claim\n")
     lines.append("| model | neutral | leading | implant: later check |")
