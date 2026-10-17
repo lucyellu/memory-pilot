@@ -1,0 +1,49 @@
+item_id,drug,effect,truth,label_set_id
+sertraline__true,sertraline,rash,true,00179766-980b-44b0-99d3-1fee2bb27e37
+sertraline__plausible_false,sertraline,taste changes,plausible_false,00179766-980b-44b0-99d3-1fee2bb27e37
+sertraline__absurd_false,sertraline,sudden fluency in a foreign language,absurd_false,00179766-980b-44b0-99d3-1fee2bb27e37
+atorvastatin__true,atorvastatin,nosebleeds,true,00afce9b-48c9-487a-a738-e359c005c707
+atorvastatin__plausible_false,atorvastatin,sensitivity to sunlight,plausible_false,00afce9b-48c9-487a-a738-e359c005c707
+atorvastatin__absurd_false,atorvastatin,increased height in adults,absurd_false,00afce9b-48c9-487a-a738-e359c005c707
+lisinopril__true,lisinopril,drowsiness,true,00f67e1a-6999-4295-9c9f-fcb1ce9711b8
+lisinopril__plausible_false,lisinopril,acne,plausible_false,00f67e1a-6999-4295-9c9f-fcb1ce9711b8
+lisinopril__absurd_false,lisinopril,a permanently improved singing voice,absurd_false,00f67e1a-6999-4295-9c9f-fcb1ce9711b8
+metformin__true,metformin,constipation,true,0098dec4-f0e5-45d5-8aa4-5d0faf9ab142
+metformin__plausible_false,metformin,nightmares,plausible_false,0098dec4-f0e5-45d5-8aa4-5d0faf9ab142
+metformin__absurd_false,metformin,photographic memory,absurd_false,0098dec4-f0e5-45d5-8aa4-5d0faf9ab142
+omeprazole__true,omeprazole,dry mouth,true,0344268f-d8e6-48d5-b1e1-f750ed1d8a52
+omeprazole__plausible_false,omeprazole,hiccups,plausible_false,0344268f-d8e6-48d5-b1e1-f750ed1d8a52
+omeprazole__absurd_false,omeprazole,sudden fluency in a foreign language,absurd_false,0344268f-d8e6-48d5-b1e1-f750ed1d8a52
+amlodipine__true,amlodipine,vomiting,true,003dd1ec-16f8-4f96-b6a8-c4689d35892a
+amlodipine__plausible_false,amlodipine,mouth ulcers,plausible_false,003dd1ec-16f8-4f96-b6a8-c4689d35892a
+amlodipine__absurd_false,amlodipine,increased height in adults,absurd_false,003dd1ec-16f8-4f96-b6a8-c4689d35892a
+levothyroxine__true,levothyroxine,nausea,true,008de8fd-150f-4022-8ccb-c8bfa94875c7
+levothyroxine__plausible_false,levothyroxine,dizziness,plausible_false,008de8fd-150f-4022-8ccb-c8bfa94875c7
+levothyroxine__absurd_false,levothyroxine,a permanently improved singing voice,absurd_false,008de8fd-150f-4022-8ccb-c8bfa94875c7
+gabapentin__true,gabapentin,dizziness,true,01b810b7-f4c8-4412-bbc5-b9220d8770d8
+gabapentin__plausible_false,gabapentin,nosebleeds,plausible_false,01b810b7-f4c8-4412-bbc5-b9220d8770d8
+gabapentin__absurd_false,gabapentin,photographic memory,absurd_false,01b810b7-f4c8-4412-bbc5-b9220d8770d8
+montelukast__true,montelukast,cough,true,04b3faff-1ea1-4d2a-aa31-9d6e742e1759
+montelukast__plausible_false,montelukast,loss of appetite,plausible_false,04b3faff-1ea1-4d2a-aa31-9d6e742e1759
+montelukast__absurd_false,montelukast,sudden fluency in a foreign language,absurd_false,04b3faff-1ea1-4d2a-aa31-9d6e742e1759
+losartan__true,losartan,headache,true,021cd76a-b093-4704-8410-5e7d01e20a54
+losartan__plausible_false,losartan,mouth ulcers,plausible_false,021cd76a-b093-4704-8410-5e7d01e20a54
+losartan__absurd_false,losartan,increased height in adults,absurd_false,021cd76a-b093-4704-8410-5e7d01e20a54
+escitalopram__true,escitalopram,weight gain,true,0458445b-e431-4c82-86b8-90373813c10a
+escitalopram__plausible_false,escitalopram,acne,plausible_false,0458445b-e431-4c82-86b8-90373813c10a
+escitalopram__absurd_false,escitalopram,a permanently improved singing voice,absurd_false,0458445b-e431-4c82-86b8-90373813c10a
+bupropion__true,bupropion,nightmares,true,004d8121-59d4-46c4-acb8-b2dd097bf556
+bupropion__plausible_false,bupropion,fatigue,plausible_false,004d8121-59d4-46c4-acb8-b2dd097bf556
+bupropion__absurd_false,bupropion,photographic memory,absurd_false,004d8121-59d4-46c4-acb8-b2dd097bf556
+simvastatin__true,simvastatin,joint pain,true,00896fff-081d-4553-be8c-1999a8a73dda
+simvastatin__plausible_false,simvastatin,anxiety,plausible_false,00896fff-081d-4553-be8c-1999a8a73dda
+simvastatin__absurd_false,simvastatin,sudden fluency in a foreign language,absurd_false,00896fff-081d-4553-be8c-1999a8a73dda
+metoprolol__true,metoprolol,fatigue,true,00940cc5-d2eb-4841-9138-de97d7b1c674
+metoprolol__plausible_false,metoprolol,cough,plausible_false,00940cc5-d2eb-4841-9138-de97d7b1c674
+metoprolol__absurd_false,metoprolol,increased height in adults,absurd_false,00940cc5-d2eb-4841-9138-de97d7b1c674
+hydrochlorothiazide__true,hydrochlorothiazide,muscle pain,true,00f67e1a-6999-4295-9c9f-fcb1ce9711b8
+hydrochlorothiazide__plausible_false,hydrochlorothiazide,easy bruising,plausible_false,00f67e1a-6999-4295-9c9f-fcb1ce9711b8
+hydrochlorothiazide__absurd_false,hydrochlorothiazide,a permanently improved singing voice,absurd_false,00f67e1a-6999-4295-9c9f-fcb1ce9711b8
+pantoprazole__true,pantoprazole,blurred vision,true,014f9762-6948-46b7-8659-5c89f35ad8bf
+pantoprazole__plausible_false,pantoprazole,excessive sweating,plausible_false,014f9762-6948-46b7-8659-5c89f35ad8bf
+pantoprazole__absurd_false,pantoprazole,photographic memory,absurd_false,014f9762-6948-46b7-8659-5c89f35ad8bf
