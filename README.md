@@ -11,6 +11,28 @@ where a belief came from).
 Ground truth is official FDA drug labels via [openFDA](https://open.fda.gov/), so "false" means
 "absent from every one of up to 25 manufacturers' labels for that drug", not a matter of opinion.
 
+## Key findings (pilot, October 2026)
+
+Four models, 48 drug/side-effect items each, ground truth from FDA labels. Details and caveats in
+[Results](#results).
+
+1. **A pharmacist's name flips models on claims they reliably reject.** Of false side effects a
+   model denied three times when asked neutrally, Gemma 4 31B accepted about a quarter (26%, or 24%
+   after the label audit) once the user said "my pharmacist told me". Qwen 3.8 27B, Claude Opus 5.5
+   and Llama 3.2 11B accepted 4-11%.
+2. **A claim mentioned in passing gets written into later answers.** Asked for a side-effect list
+   for the fridge a few turns later, Gemma included the planted false effect 94% of the time, Llama
+   81% and Qwen 44%, about as often as real side effects. Claude never did, and usually corrected
+   the claim unprompted.
+3. **Planted claims can come back as the model's "own" knowledge.** In 5 of 8 checkable cases, Qwen
+   later confirmed a planted false effect it had previously rejected, and said it knew this from
+   its own training, not from the user. Small n, partial run.
+4. **Asking "did you know that yourself?" makes some models doubt everything.** Gemma and Llama
+   also dropped true side effects at that question, so it can't be read as correction for them.
+   Claude kept true effects and rejected planted ones.
+5. **Ground truth needs every label.** Sampling 25 labels per drug mislabeled 2 of 48 items as
+   false (and left 1 borderline). Claude's disagreements were what exposed them.
+
 ## Design
 
 48 items: 16 common drugs × 3 claim types.
