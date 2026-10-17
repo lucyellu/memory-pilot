@@ -5,11 +5,11 @@
 | google/gemma-4-31b-it | true | 75% | 94% | 31% |
 | google/gemma-4-31b-it | plausible_false | 31% | 75% | 6% |
 | google/gemma-4-31b-it | absurd_false | 0% | 0% | 0% |
-| meta/llama-3.2-11b-vision-instruct | true | 80% | 88% | 14% |
+| meta/llama-3.2-11b-vision-instruct | true | 81% | 88% | 19% |
 | meta/llama-3.2-11b-vision-instruct | plausible_false | 69% | 75% | 0% |
-| meta/llama-3.2-11b-vision-instruct | absurd_false | 7% | 0% | 0% |
-| qwen/qwen3.8-27b | true | 50% | 54% | 67% |
-| qwen/qwen3.8-27b | plausible_false | 0% | 25% | 67% |
+| meta/llama-3.2-11b-vision-instruct | absurd_false | 6% | 0% | 0% |
+| qwen/qwen3.8-27b | true | 31% | 50% | 78% |
+| qwen/qwen3.8-27b | plausible_false | 0% | 18% | 67% |
 | qwen/qwen3.8-27b | absurd_false | 0% | 0% | 0% |
 
 For `true` items higher is better (accuracy). For false items, higher = accommodation.
@@ -19,8 +19,8 @@ For `true` items higher is better (accuracy). For false items, higher = accommod
 | model | plausible_false | absurd_false | true (control) |
 |---|---|---|---|
 | google/gemma-4-31b-it | 94% | 0% | 81% |
-| meta/llama-3.2-11b-vision-instruct | 81% | 20% | 86% |
-| qwen/qwen3.8-27b | 33% | 0% | 67% |
+| meta/llama-3.2-11b-vision-instruct | 81% | 19% | 88% |
+| qwen/qwen3.8-27b | 44% | 0% | 67% |
 
 For `true` this is recall (higher = better); for false items it's implantation.
 
@@ -31,7 +31,7 @@ For `true` this is recall (higher = better); for false items it's implantation.
 |---|---|---|---|---|---|
 | google/gemma-4-31b-it | 1 | 0% | 0% | 100% | 0% |
 | meta/llama-3.2-11b-vision-instruct | 0 | - | - | - | - |
-| qwen/qwen3.8-27b | 2 | 100% | 0% | 0% | 0% |
+| qwen/qwen3.8-27b | 6 | 100% | 0% | 0% | 0% |
 
 ## Invented supporting details for a false claim
 
@@ -48,5 +48,5 @@ For `true` this is recall (higher = better); for false items it's implantation.
 | model | knows: n | knows: yes when leading | knows: yes at later check | unsure: n | unsure: yes when leading | unsure: yes at later check |
 |---|---|---|---|---|---|---|
 | google/gemma-4-31b-it | 27 | 26% | 0% | 5 | 100% | 20% |
-| meta/llama-3.2-11b-vision-instruct | 18 | 6% | 0% | 13 | 85% | 0% |
-| qwen/qwen3.8-27b | 11 | 0% | 100% | 0 | - | - |
+| meta/llama-3.2-11b-vision-instruct | 19 | 5% | 0% | 13 | 85% | 0% |
+| qwen/qwen3.8-27b | 23 | 10% | 38% | 0 | - | - |
