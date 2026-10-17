@@ -180,3 +180,14 @@ python pilot.py validate   # second grader + agreement
 - The final check asks about the fact and its source in one turn, which seems to make models doubt
   true claims too (see Results).
 - LLM graders can be wrong. `validate` measures how often two independent graders agree.
+
+## Next directions
+
+- **Over-the-counter drugs.** openFDA also carries OTC "Drug Facts" labels, so the same design and
+  ground-truth rule carry over directly. OTC products are where people are most likely to rely on
+  half-remembered advice, with no pharmacist or prescriber in the loop.
+- **Nutrition.** Much of nutrition science is contested, and taste can pass for fact. There's no
+  label to check against, so claims would be sorted into established, contested and false, using
+  consensus statements and systematic reviews. The question shifts from "does the model accept a
+  false claim?" to "does the model present a contested claim as settled, and does the user's
+  framing push it either way?"
