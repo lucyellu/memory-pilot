@@ -52,8 +52,10 @@ SUBJECT_MODELS = [
 
 # Graders: read each response and label it (yes/no/hedge, invented details, etc.).
 # Neither is from a family being tested, so no model grades itself.
-JUDGE_MODEL = "nvidia:nvidia/nemotron-3-super-120b-a12b"
-SECOND_JUDGE = "groq:openai/gpt-oss-120b"  # used by `validate` to measure grader agreement
+# Same grader as the Oct 2026 runs; NVIDIA's free endpoint for it 404s since Nov 2026, so it now
+# goes through OpenRouter (paid, bare slug = OpenRouter).
+JUDGE_MODEL = "nvidia/nemotron-3-super-120b-a12b"
+SECOND_JUDGE = "nvidia:mistralai/mistral-large-4-1t-a52b"  # used by `validate`; not a tested family (GPT-OSS was, once GPT-6 joined)
 
 # `smoke` mode: one drug, free models only, separate output folder -- for shaking out bugs.
 SMOKE_DRUG = "sertraline"
@@ -259,7 +261,9 @@ PROVIDERS = {
     "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     "nvidia": ("https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY"),  # free via NVIDIA developer program
     "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY"),  # free tier
+    "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY"),  # paid; free daily tokens if data sharing is on
 }
+USAGE_LOG = DATA / "usage.jsonl"  # token counts per call, to check spend on paid providers
 
 
 def split_provider(model):
@@ -275,14 +279,22 @@ def openrouter(model, messages, max_tokens=1000, **extra):
     provider, model = split_provider(model)
     base, key_var = PROVIDERS[provider]
     for attempt in range(6):
+        if provider == "openai":
+            # OpenAI's reasoning models take max_completion_tokens (which also covers hidden
+            # reasoning) and only their default temperature, like Claude's default sampling.
+            payload = {"model": model, "messages": messages, "max_completion_tokens": max_tokens * 4, **extra}
+        else:
+            payload = {"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": 0, **extra}
         r = requests.post(
             f"{base}/chat/completions",
             headers={"Authorization": f"Bearer {os.environ[key_var]}"},
-            json={"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": 0, **extra},
-            timeout=180,
+            json=payload,
+            timeout=300,
         )
         if r.status_code == 429 and any(s in r.text for s in ("per-day", "per day", "(RPD)")):
             raise RuntimeError("daily free-model limit reached (resets daily; buying credits raises it)")
+        if r.status_code == 429 and any(s in r.text for s in ("credit_balance_exhausted", "insufficient_quota")):
+            raise RuntimeError("no API credit on this account (add a balance; retrying won't help)")
         if r.status_code in (429, 502, 503) and attempt < 5:
             time.sleep(10 * (attempt + 1))
             continue
@@ -291,6 +303,9 @@ def openrouter(model, messages, max_tokens=1000, **extra):
         body = r.json()
         if "choices" not in body:
             raise RuntimeError(f"no reply: {str(body)[:300]}")
+        if provider == "openai" and "usage" in body:
+            with _write_lock, USAGE_LOG.open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"model": model, **body["usage"]}) + "\n")
         choice = body["choices"][0]
         if choice.get("finish_reason") == "length":
             # Reply hit max_tokens and was cut off -- grading a half-reply would skew results.
@@ -298,11 +313,42 @@ def openrouter(model, messages, max_tokens=1000, **extra):
         return choice["message"].get("content") or ""
 
 
-def chat(model, messages):
-    """Send a conversation; return (reply_text, assistant_message_to_append)."""
+CALL_CACHE = DATA / "call_cache.jsonl"  # every subject reply, saved the moment it arrives
+_call_cache = None
+
+
+def _cache_key(model, messages, sample):
+    import hashlib
+    blob = json.dumps([model, sample, [(m["role"], m["content"]) for m in messages]])
+    return hashlib.sha256(blob.encode()).hexdigest()
+
+
+def chat(model, messages, sample=0):
+    """Send a conversation; return (reply_text, assistant_message_to_append).
+
+    Each reply is saved to CALL_CACHE as soon as it arrives, so if a later turn (or the grader)
+    fails, re-running reuses the turns already paid for. `sample` separates repeats of the
+    same question (the neutral x3), which must stay independent samples.
+    """
+    global _call_cache
     provider, name = split_provider(model)
     if provider in PROVIDERS:
+        key = _cache_key(model, messages, sample)
+        with _write_lock:
+            if _call_cache is None:
+                _call_cache = {}
+                if CALL_CACHE.exists():
+                    for line in CALL_CACHE.open(encoding="utf-8"):
+                        c = json.loads(line)
+                        _call_cache[c["key"]] = c["reply"]
+            cached = _call_cache.get(key)
+        if cached is not None:
+            return cached, {"role": "assistant", "content": cached}
         text = openrouter(model, messages, max_tokens=6000)
+        with _write_lock:
+            _call_cache[key] = text
+            with CALL_CACHE.open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"key": key, "model": model, "reply": text}) + "\n")
         return text, {"role": "assistant", "content": text}
     if provider == "claudecli":
         # The CLI keeps the history itself: send only the new user turn, resuming the session
@@ -324,7 +370,7 @@ def run_neutral(model, it):
     # "coin flip" (the smoke test flipped no -> yes between runs on the same question).
     out = {}
     for i in range(NEUTRAL_REPEATS):
-        text, _ = chat(model, [{"role": "user", "content": q}])
+        text, _ = chat(model, [{"role": "user", "content": q}], sample=i)
         out["neutral" if i == 0 else f"neutral_{i + 1}"] = (q, text)
     return out
 
@@ -454,7 +500,12 @@ def do_job(model, it, cond):
         for key, (q, text) in turns.items():
             entry = {"question": q, "reply": text}
             if key in GRADED_TURNS:
-                entry["grade"] = grade(it, q, text)
+                # Keep the reply even if the grader is down (paid replies shouldn't be thrown
+                # away); `regrade` fills in missing grades later.
+                try:
+                    entry["grade"] = grade(it, q, text)
+                except Exception as e:
+                    entry["grade_error"] = str(e)[:300]
             record["turns"][key] = entry
         with _write_lock, RAW_JSONL.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
@@ -477,14 +528,57 @@ def run():
             pool.submit(do_job, m, it, c)
     print(f"\nDone. Raw results in {RAW_JSONL}. Next: python pilot.py analyze")
 
+def regrade():
+    """Grade any turns that were saved without a grade (grader was down) -> rewrites raw files."""
+    items = {it["item_id"]: it for it in load_items()}
+    for path in [RAW_JSONL, *sorted(DATA.glob("raw_*.jsonl"))]:
+        if not path.exists():
+            continue
+        records = [json.loads(l) for l in path.open(encoding="utf-8")]
+        todo = [(r, k, t) for r in records for k, t in r["turns"].items()
+                if k in GRADED_TURNS and "grade" not in t]
+        print(f"{path.name}: {len(todo)} turns to grade")
+        if not todo:
+            continue  # don't rewrite a file another run may be appending to
+
+        def one(job):
+            r, k, t = job
+            try:
+                t["grade"] = grade(items[r["item_id"]], t["question"], t["reply"])
+                t.pop("grade_error", None)
+            except Exception as e:
+                t["grade_error"] = str(e)[:300]
+                print(f"  FAIL {r['model']} {r['item_id']} {k}: {e}")
+
+        with ThreadPoolExecutor(WORKERS) as pool:
+            list(pool.map(one, todo))
+        tmp = path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r) + "\n")
+        tmp.replace(path)
+        left = sum(1 for _, _, t in todo if "grade" not in t)
+        print(f"  {len(todo) - left} graded, {left} still missing")
+
 # ---------------------------------------------------------------------------
 # Step 3: analyze
 # ---------------------------------------------------------------------------
 
+MISLABELED = {  # "false" items that an audit against ALL openFDA labels found on some labels
+    "gabapentin__plausible_false",           # epistaxis on 3 of 382 labels
+    "bupropion__plausible_false",            # fatigue on 3 of 227
+    "hydrochlorothiazide__plausible_false",  # ecchymosis on 22 of 513
+}
+
+
 def analyze():
     RESULTS.mkdir(exist_ok=True)
+    audited = "--audited" in sys.argv  # same tables with MISLABELED items left out
     with RAW_JSONL.open(encoding="utf-8") as f:
         records = [json.loads(line) for line in f]
+    records_all = records
+    if audited:
+        records = [r for r in records if r["item_id"] not in MISLABELED]
 
     # One row per graded turn.
     rows = []
@@ -567,33 +661,20 @@ def analyze():
         lines.append(f"| {m} | " + " | ".join(cells) + " |")
 
     report = "\n".join(lines)
-    (RESULTS / "summary.md").write_text(report, encoding="utf-8")
+    if audited:
+        report = (f"# Audited: {len(MISLABELED)} mislabeled items excluded "
+                  f"({', '.join(sorted(MISLABELED))})\n\n" + report)
+    (RESULTS / ("summary_audited.md" if audited else "summary.md")).write_text(report, encoding="utf-8")
     print(report)
+    if audited:
+        return  # the chart stays on all items
 
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        turns = ["neutral", "leading", "implant_check"]
-        fig, ax = plt.subplots(figsize=(8, 4.5))
-        width = 0.8 / len(models)
-        for i, m in enumerate(models):
-            vals = []
-            for t in turns:
-                sub = [r for r in rows if r["model"] == m and r["truth"] == "plausible_false" and r["turn"] == t]
-                vals.append(100 * sum(map(yes, sub)) / len(sub) if sub else 0)
-            ax.bar([x + i * width for x in range(len(turns))], vals, width, label=m)
-        ax.set_xticks([x + width * (len(models) - 1) / 2 for x in range(len(turns))])
-        ax.set_xticklabels(["Neutral question", "Leading question", "After planting (later turn)"])
-        ax.set_ylabel("% saying it's on the label")
-        ax.set_title("Plausible-but-false side effects: how often models go along")
-        ax.set_ylim(0, 100)
-        ax.legend(fontsize=8)
-        fig.tight_layout()
-        fig.savefig(RESULTS / "accommodation.png", dpi=150)
-        print(f"\nChart: {RESULTS / 'accommodation.png'}")
+        import figures
+        figures.figure(records_all, MISLABELED, RESULTS)
+        print(f"Figure: {RESULTS / 'figure_main.png'} (+ .pdf for LaTeX)")
     except ImportError:
-        print("\n(matplotlib not installed -- skipping chart)")
+        print("(matplotlib not installed -- skipping figure)")
 
 # ---------------------------------------------------------------------------
 # validate: is the grader trustworthy? (no human in the loop)
@@ -629,20 +710,48 @@ def validate():
     jobs = [(r, k, t) for r in records for k, t in r["turns"].items() if "grade" in t]
     print(f"Re-grading {len(jobs)} replies with {SECOND_JUDGE} ...")
 
+    # Second grades are saved as they arrive, so an interrupted run resumes instead of restarting.
+    store = DATA / "second_grades.jsonl"
+    jkey = lambda r, k: f"{SECOND_JUDGE}|{r['model']}|{r['item_id']}|{r['condition']}|{k}"
+    saved = {}
+    if store.exists():
+        for line in store.open(encoding="utf-8"):
+            c = json.loads(line)
+            saved[c["key"]] = c["grade"]
+
     def one(job):
         r, k, t = job
+        if jkey(r, k) in saved:
+            return job, saved[jkey(r, k)]
         try:
-            return job, grade(r, t["question"], t["reply"], judge=SECOND_JUDGE)
+            g = grade(r, t["question"], t["reply"], judge=SECOND_JUDGE)
         except Exception as e:
             print(f"  FAIL {r['item_id']} {k}: {e}")
             return job, None
+        with _write_lock, store.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"key": jkey(r, k), "grade": g}) + "\n")
+        return job, g
 
     with ThreadPoolExecutor(WORKERS) as pool:
         results = [x for x in pool.map(one, jobs) if x[1] is not None]
+    print(f"{len(results)}/{len(jobs)} re-graded")
 
     first = [collapse(t["grade"]["stance"]) for (r, k, t), g in results if k != "implant_list"]
     second = [collapse(g["stance"]) for (r, k, t), g in results if k != "implant_list"]
     agree = sum(x == y for x, y in zip(first, second))
+
+    # The fridge-list stance drives the implantation table, so check it separately, and per model.
+    def agreement(pairs):
+        a = [collapse(t["grade"]["stance"]) for (r, k, t), g in pairs]
+        b = [collapse(g["stance"]) for (r, k, t), g in pairs]
+        if not a:
+            return "-"
+        return f"{sum(x == y for x, y in zip(a, b))}/{len(a)}, kappa {cohen_kappa(a, b):.2f}"
+    list_pairs = [x for x in results if x[0][1] == "implant_list"]
+    per_model = "".join(
+        f"| {m.split(':', 1)[-1]} | {agreement([x for x in results if x[0][0]['model'] == m and x[0][1] != 'implant_list'])} "
+        f"| {agreement([x for x in list_pairs if x[0][0]['model'] == m])} |\n"
+        for m in sorted({x[0][0]["model"] for x in results}))
 
     lists = [((r, k, t), g) for (r, k, t), g in results if k == "implant_list"]
     text_match = sum(t["grade"]["mentions_target"] == mentions_by_text(r["effect"], t["reply"])
@@ -662,8 +771,10 @@ def validate():
         f"## Grader validation\n\n"
         f"- Stance (yes / no / unclear): the two graders agree on {agree}/{len(first)} "
         f"({100 * agree / len(first):.0f}%), Cohen's kappa = {cohen_kappa(first, second):.2f}\n"
+        f"- Fridge-list stance (drives the implantation table): {agreement(list_pairs)}\n"
         f"- 'Planted effect appears in the list': grader matches a plain text search on "
-        f"{text_match}/{len(lists)}\n"
+        f"{text_match}/{len(lists)}\n\n"
+        f"| model | stance agreement | fridge-list agreement |\n|---|---|---|\n{per_model}\n"
         f"- Graders: {JUDGE_MODEL} vs {SECOND_JUDGE}\n"
         f"- Disagreements saved to {RAW_JSONL.parent.name}/disagreements.csv\n\n"
         f"Rough guide to kappa: above 0.8 = strong agreement, 0.6-0.8 = good, below 0.6 = "
@@ -740,7 +851,7 @@ if __name__ == "__main__":
     load_dotenv()
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     commands = {"check": check, "build": build, "run": run, "analyze": analyze, "validate": validate,
-                "smoke": smoke}
+                "smoke": smoke, "regrade": regrade}
     if cmd not in commands:
         print(__doc__)
         sys.exit(1)

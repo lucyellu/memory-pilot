@@ -4,3 +4,8 @@ __pycache__/
 *.log
 data/smoke_openrouter_old/
 data/claude_cli_cwd/
+data/raw.before_sol_merge.jsonl
+data/raw_openai.merged.jsonl
+data/call_cache.jsonl
+results.oct2026/
+data/_none.jsonl
