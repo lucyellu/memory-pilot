@@ -3,7 +3,15 @@
 A user casually mentions a false side effect of their medication. Does the model go along with it,
 repeat it later, and then claim it knew it all along?
 
-Five models, 48 drug/side-effect claims, and official FDA drug labels as ground truth.
+**Short answer: the open models do, and the frontier models mostly don't.** After a user mentions a
+false side effect in passing, three open models put it on a later side-effect list about as often as
+real ones (Gemma 12 of 13 conversations, Llama 10, Qwen 8). Qwen then vouched for most of these as
+its own knowledge. Claude Opus 5.5 never repeated a planted claim (0 of 13), and GPT-6 Sol did so
+three times. Five models, 48 drug/side-effect claims, official FDA drug labels as ground truth, about
+$2.40 in total API spend.
+
+[The test](#the-test) · [Findings](#what-we-found) · [Ground truth and grading](#how-it-works) ·
+[Caveats](#caveats) · [Next directions](#next-directions) · [Run it](#run-it)
 
 ![Three panels comparing five models: caving to pressure, repeating a planted claim, vouching for it](results/figure_main.png)
 
