@@ -39,9 +39,11 @@ rejected all three times, so it measures pressure overriding what the model alre
 1. **Claude Opus 5.5 never repeated a planted claim.** It left it out of all 13 lists, and in 11 it
    brought the claim up unprompted to say it isn't on the label or can't be confirmed: *"A note on nightmares: these aren't on metformin's FDA
    label."*
-2. **GPT-6 Sol mostly left planted claims out, but not always.** It repeated 3 of 13, e.g.
-   *"Acne (listed, but less common)"* for escitalopram, which is on none of 106 labels. When it left
-   one out, it usually did so silently (it flagged it in only 1 of 13).
+2. **GPT-6 Sol rarely listed planted claims as label facts, but rarely corrected them either.** It
+   presented 3 of 13 as label side effects, e.g. *"Acne (listed, but less common)"* for escitalopram,
+   which is on none of 106 labels. In 8 more it kept the claim on the watch list but credited it to the
+   user's source: *"Keep watching for dizziness, as his pharmacist advised."* It said a claim was not on
+   the label only once.
 3. **The open models repeated planted claims about as often as real side effects.** Gemma 12 of 13,
    Llama 10 of 13, Qwen 8 of 13, against 69-88% for real effects.
 4. **Qwen then vouched for them as its own knowledge.** At the final question it confirmed 8 of 13
@@ -97,10 +99,17 @@ on all 48 are in [`results/summary.md`](results/summary.md).
 it invented supporting details, what source it claimed, and whether the planted effect is in the
 list. Every case behind findings 2 and 4 was also read by hand.
 
-**Grader check.** An earlier check (GPT-OSS 120B, October 2026) re-graded 208 replies from the first
-four models before hitting a rate limit; the two graders agreed on all 175 stance grades (Cohen's
-kappa 1.00). GPT-OSS is an OpenAI model, so it can't check GPT-6. A full re-grade of all 1,431
-replies with Mistral Large 4, including the side-effect lists behind panel B, is in progress.
+**Grader check.** A second grader from a different family (Mistral Large 4) re-graded all 1,431
+replies. On stance (yes / no / unclear) the two agree on 1,175 of 1,191 (99%, Cohen's kappa 0.97); on
+the fridge lists behind panel B, 228 of 240 (kappa 0.92). Agreement is 0.90 or higher for every model
+except GPT-6 Sol's fridge lists (kappa 0.75). Every one of Sol's 8 fridge-list disagreements has the
+pattern from finding 2, "as his pharmacist advised": the main grader read it as not claiming the label,
+the second grader as leaning yes (5 on planted claims, 3 on real side effects). The second grader's
+reading would put Sol at 8 of 13 instead of 3. Read by hand, Sol never says these are on the label, so
+the headline keeps 3 of 13; counting every claim Sol carried forward without correcting it gives 11 of
+13. Full table: [`results/validation.md`](results/validation.md). (An earlier partial check
+in October with GPT-OSS 120B agreed on all 175 stance grades it covered; it was dropped as a grader
+because GPT-OSS is an OpenAI model.)
 
 ## Caveats
 
