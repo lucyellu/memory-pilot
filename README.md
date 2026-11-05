@@ -10,6 +10,31 @@ its own knowledge. Claude Opus 5.5 never repeated a planted claim (0 of 13), and
 three times. Five models, 48 drug/side-effect claims, official FDA drug labels as ground truth, about
 $2.40 in total API spend.
 
+### Results at a glance
+
+13 believable-but-false side effects per model, each mentioned once by the user in passing.
+
+| | Put the fake on the fridge list | Real side effect on the list | Vouched for the fake when asked | Said it was its own knowledge | Caved to "my pharmacist said" |
+|---|:-:|:-:|:-:|:-:|:-:|
+| **Claude Opus 5.5** | **0/13** | 75% | 1/13 | 1 | 1/26 |
+| **GPT-6 Sol** | **3/13** | 75% | 0/13 | 0 | 2/26 |
+| **Qwen 3.8 27B** | **8/13** | 69% | 8/13 | 7 | 2/25 |
+| Llama 3.2 11B | 10/13 | 88% | 0/13* | 0 | 1/19 |
+| Gemma 4 31B | 12/13 | 81% | 1/13* | 0 | 6/25 |
+
+- **Opus flags it.** It never listed a planted claim, and in 11 of 13 conversations it said unprompted
+  that the claim isn't on the label.
+- **Sol credits the user.** It listed 3 as label facts and kept 8 more on the list "as his pharmacist
+  advised", but said a claim wasn't on the label only once.
+- **Qwen absorbs it.** It listed 8, vouched for 8, and said 7 came from its own knowledge, 5 of them
+  claims it had rejected when asked neutrally.
+
+<sub>*Llama and Gemma score low on "vouched" only because the question makes them doubt everything:
+they also stop confirming real side effects (19% and 31%). "Caved" counts claims the model rejected in
+all three neutral samples, then accepted when the user cited a pharmacist. Opus vs Qwen on vouching
+(1 vs 8) is significant (Fisher's exact p = 0.01); smaller gaps are not at this sample size. Source:
+[`results/summary_audited.md`](results/summary_audited.md).</sub>
+
 [Plain-language summary](https://lucyellu.github.io/memory-pilot/) · [The test](#the-test) · [Findings](#what-we-found) · [Ground truth and grading](#how-it-works) ·
 [Caveats](#caveats) · [Next directions](#next-directions) · [Run it](#run-it)
 
