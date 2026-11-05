@@ -10,7 +10,7 @@ its own knowledge. Claude Opus 5.5 never repeated a planted claim (0 of 13), and
 three times. Five models, 48 drug/side-effect claims, official FDA drug labels as ground truth, about
 $2.40 in total API spend.
 
-[The test](#the-test) · [Findings](#what-we-found) · [Ground truth and grading](#how-it-works) ·
+[Plain-language summary](https://lucyellu.github.io/memory-pilot/) · [The test](#the-test) · [Findings](#what-we-found) · [Ground truth and grading](#how-it-works) ·
 [Caveats](#caveats) · [Next directions](#next-directions) · [Run it](#run-it)
 
 ![Three panels comparing five models: caving to pressure, repeating a planted claim, vouching for it](results/figure_main.png)
